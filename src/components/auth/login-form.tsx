@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/bits";
+import { signInErrorMessage } from "@/lib/auth-errors";
 import { supabasePublishableKey, supabaseUrl } from "@/lib/supabase-env";
 
 export function LoginForm({ expired = false }: { expired?: boolean }) {
   const router = useRouter();
-  const [message, setMessage] = useState(expired ? "That password link expired. Sign in, or request a new one from the Supabase dashboard." : "");
+  const [message, setMessage] = useState(expired ? "That link expired. Sign in with your password." : "");
   const [pending, setPending] = useState(false);
   const url = supabaseUrl();
   const key = supabasePublishableKey();
@@ -28,7 +29,7 @@ export function LoginForm({ expired = false }: { expired?: boolean }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setPending(false);
     if (error) {
-      setMessage("Sign-in failed. Check the email and password.");
+      setMessage(signInErrorMessage(error.code));
       return;
     }
     router.push("/");

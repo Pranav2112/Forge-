@@ -224,7 +224,16 @@ export async function buildBackup(db: PrismaClient): Promise<BackupFile> {
     sets, cardio, hyroxSessions, hyroxSegments, weights, measurements, photos, water, steps,
   ] = await Promise.all([
     db.userProfile.findUnique({ where: { id: "default" } }),
-    db.userSettings.findUnique({ where: { id: "default" } }),
+    db.userSettings.findUnique({ where: { id: "default" } }).then((row) => row && ({
+      id: row.id,
+      weightUnit: row.weightUnit,
+      lengthUnit: row.lengthUnit,
+      distanceUnit: row.distanceUnit,
+      restTimerSeconds: row.restTimerSeconds,
+      usdaApiKey: row.usdaApiKey,
+      catalogVersion: row.catalogVersion,
+      ownerId: row.ownerId,
+    })),
     db.nutritionTarget.findMany(),
     db.goal.findMany(),
     db.food.findMany(),

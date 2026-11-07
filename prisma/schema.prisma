@@ -35,6 +35,9 @@ model UserSettings {
   usdaApiKey       String @default("")
   catalogVersion   Int    @default(0)
   ownerId          String @default("")
+  activationCodeHash String   @default("")
+  activationExpiresAt DateTime?
+  activationAttempts  Int      @default(0)
 }
 
 /// A target that applies from effectiveFrom until a later row replaces it.
