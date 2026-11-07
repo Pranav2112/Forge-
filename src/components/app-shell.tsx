@@ -83,6 +83,9 @@ function active(pathname: string, href: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const collapsed = useSyncExternalStore(subscribeCollapsed, collapsedNow, () => false);
+  if (pathname === "/login" || pathname.startsWith("/auth/")) {
+    return <div className="min-h-screen bg-background">{children}</div>;
+  }
 
   function toggle() {
     setCollapsed(!collapsed);

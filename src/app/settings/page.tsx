@@ -1,7 +1,9 @@
 import { Suspense } from "react";
+import { PasswordForm } from "@/components/auth/password-form";
 import { BackupPanel, ProfileForm, TargetForm, UnitsForm } from "@/components/settings/settings-forms";
 import { PageHeader, ScreenFallback, SetupRequired } from "@/components/bits";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { currentUser } from "@/lib/auth";
 import { getSettings } from "@/lib/queries";
 
 export const metadata = { title: "Settings" };
@@ -17,11 +19,21 @@ export default function Page() {
 async function Settings() {
   const data = await getSettings();
   if (!data.ready) return <SetupRequired />;
+  const user = await currentUser();
   const current = data.targets[0];
   return (
     <div>
-      <PageHeader eyebrow="Settings" title="Profile, targets, backup" description="This copy is a single private user. Do not put it on the public internet without authentication." />
+      <PageHeader eyebrow="Settings" title="Profile, targets, backup" description="This copy is a single private account." />
       <div className="grid gap-4">
+        {user ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Password</CardTitle>
+              <CardDescription>Signed in as {user.email}. The new password is sent to Supabase Auth and is not stored in FORGE.</CardDescription>
+            </CardHeader>
+            <CardContent><PasswordForm mode="change" email={user.email} /></CardContent>
+          </Card>
+        ) : null}
         <Card>
           <CardHeader><CardTitle>Profile</CardTitle><CardDescription>Lacto-vegetarian defaults are editable. Eggs, meat, and fish start on the excluded list.</CardDescription></CardHeader>
           <CardContent><ProfileForm profile={data.profile} weightUnit={data.settings.weightUnit} lengthUnit={data.settings.lengthUnit} /></CardContent>

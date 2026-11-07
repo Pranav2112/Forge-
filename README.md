@@ -55,7 +55,7 @@ Open Food Facts search works without a key and skips products that are missing c
 
 ## Sign-in and cloud database
 
-Production uses Supabase Postgres and Supabase Auth. The original SQLite file stays on this machine and is not deleted.
+Production uses Supabase Postgres and Supabase email-and-password auth. Public signup stays off, and only `ALLOWED_EMAIL` can open the records. Change the password in Settings after signing in. The original SQLite file stays on this machine and is not deleted.
 
 Required environment variables:
 

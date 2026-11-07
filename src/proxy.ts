@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
   const email = data.user?.email?.toLowerCase();
   const allowed = process.env.ALLOWED_EMAIL.trim().toLowerCase();
   const path = request.nextUrl.pathname;
-  const signingIn = path === "/login" || path === "/auth/confirm";
+  const signingIn = path === "/login" || path === "/auth/confirm" || path === "/auth/password";
   if (data.user && email === allowed) return response;
   if (signingIn) return response;
   const login = request.nextUrl.clone();
