@@ -10,21 +10,22 @@ import { supabasePublishableKey, supabaseUrl } from "@/lib/supabase-env";
 
 export function LoginForm({ expired = false }: { expired?: boolean }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [message, setMessage] = useState(expired ? "That password link expired. Sign in, or request a new one from the Supabase dashboard." : "");
   const [pending, setPending] = useState(false);
   const url = supabaseUrl();
   const key = supabasePublishableKey();
   const configured = Boolean(url && key);
 
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!configured) return;
+    const data = new FormData(event.currentTarget);
+    const email = String(data.get("email") || "").trim();
+    const password = String(data.get("password") || "");
     setPending(true);
     setMessage("");
     const supabase = createBrowserClient(url, key);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setPending(false);
     if (error) {
       setMessage("Sign-in failed. Check the email and password.");
@@ -41,25 +42,12 @@ export function LoginForm({ expired = false }: { expired?: boolean }) {
   return (
     <form className="grid gap-3" onSubmit={submit}>
       <Field label="Email">
-        <Input
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
+        <Input name="email" type="email" autoComplete="username" required />
       </Field>
       <Field label="Password">
-        <Input
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          minLength={8}
-          required
-        />
+        <Input name="password" type="password" autoComplete="current-password" minLength={8} required />
       </Field>
-      <Button type="submit" disabled={pending || password.length < 8}>
+      <Button type="submit" disabled={pending}>
         {pending ? "Signing in" : "Sign in"}
       </Button>
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
