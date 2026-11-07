@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { buildBackup, importBackup } from "../src/lib/backup";
@@ -10,17 +7,29 @@ import { buildBackup, importBackup } from "../src/lib/backup";
 let db: PrismaClient;
 let url: string;
 
+function isolatedPostgresUrl(base: string) {
+  const parsed = new URL(base);
+  parsed.searchParams.set("schema", "forge_test");
+  parsed.searchParams.set("connection_limit", "1");
+  parsed.searchParams.set("pool_timeout", "30");
+  const href = parsed.toString();
+  if (!href.includes("schema=forge_test")) throw new Error("Refusing to run persistence tests outside the forge_test schema.");
+  return href;
+}
+
 before(() => {
-  const dir = mkdtempSync(path.join(tmpdir(), "forge-test-"));
-  url = `file:${path.join(dir, "test.db")}`;
+  const direct = process.env.DIRECT_URL;
+  if (!direct?.startsWith("postgres")) throw new Error("DIRECT_URL must be a Postgres URL before persistence tests run.");
+  url = isolatedPostgresUrl(direct);
   execSync("npx prisma db push --skip-generate --accept-data-loss", {
-    env: { ...process.env, DATABASE_URL: url },
+    env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
     stdio: "pipe",
   });
   db = new PrismaClient({ datasources: { db: { url } } });
 });
 
 after(async () => {
+  await db.$executeRawUnsafe("DROP SCHEMA IF EXISTS forge_test CASCADE");
   await db.$disconnect();
 });
 

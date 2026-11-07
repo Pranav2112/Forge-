@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/bits";
+import { supabasePublishableKey, supabaseUrl } from "@/lib/supabase-env";
 
 export function LoginForm() {
   const router = useRouter();
@@ -13,25 +14,42 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
-  const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const url = supabaseUrl();
+  const key = supabasePublishableKey();
+  const configured = Boolean(url && key);
+
+  function client() {
+    return createBrowserClient(url, key);
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!configured) return;
     setPending(true);
     setMessage("");
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
-    );
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await client().auth.signInWithPassword({ email, password });
     setPending(false);
     if (error) {
-      setMessage("Sign-in failed. Check the email and password.");
+      setMessage("Sign-in failed. Check the email and password, or use the email link.");
       return;
     }
     router.push("/");
     router.refresh();
+  }
+
+  async function sendLink() {
+    if (!configured || !email) return;
+    setPending(true);
+    setMessage("");
+    const { error } = await client().auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: `${window.location.origin}/auth/confirm`,
+      },
+    });
+    setPending(false);
+    setMessage(error ? "Could not send the sign-in email." : "Check your email for the sign-in link.");
   }
 
   if (!configured) {
@@ -44,10 +62,13 @@ export function LoginForm() {
         <Input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required />
       </Field>
       <Field label="Password">
-        <Input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        <Input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
       </Field>
-      <Button type="submit" disabled={pending}>{pending ? "Signing in" : "Sign in"}</Button>
-      {message ? <p className="text-sm text-destructive">{message}</p> : null}
+      <Button type="submit" disabled={pending || password.length === 0}>{pending ? "Signing in" : "Sign in"}</Button>
+      <Button type="button" variant="outline" disabled={pending || email.length === 0} onClick={sendLink}>
+        Email me a sign-in link
+      </Button>
+      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
     </form>
   );
 }

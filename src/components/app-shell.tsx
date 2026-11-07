@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { supabasePublishableKey, supabaseUrl } from "@/lib/supabase-env";
 import { useSyncExternalStore } from "react";
 import {
   Activity,
@@ -58,13 +59,11 @@ function setCollapsed(next: boolean) {
 
 function SignOut({ collapsed = false }: { collapsed?: boolean }) {
   const router = useRouter();
-  const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-  if (!configured) return null;
+  const url = supabaseUrl();
+  const key = supabasePublishableKey();
+  if (!url || !key) return null;
   async function signOut() {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
-    );
+    const supabase = createBrowserClient(url, key);
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

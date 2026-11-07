@@ -53,35 +53,23 @@ Optimum Nutrition Gold Standard Whey uses the label: 32 g, 120 kcal, 24 g protei
 
 Open Food Facts search works without a key and skips products that are missing calories or macros. USDA FoodData Central search needs a key in Settings or `USDA_API_KEY`. Branded USDA foods are skipped. If the network or key is missing, local foods still work.
 
-## Deploying later
-
-SQLite is a file. A typical serverless host does not keep that file. Do not deploy this as-is to an ephemeral filesystem.
-
-For a hosted copy:
-
-1. Put the app on a server with a persistent disk, or switch Prisma `provider` to `postgresql` and point `DATABASE_URL` at Postgres.
-2. Run `npx prisma db push` (or a migration) against that database and seed it.
-3. Add real authentication before the app is reachable. There is no login in this local copy, and personal records must not sit on an unauthenticated public API.
-4. Leave `FORGE_PRIVATE_DEPLOYMENT` false unless the deploy is private. Photo URLs return 403 in production until that flag is set, and even then they are not a public CDN.
-
 ## Sign-in and cloud database
 
-Local `npm run dev` stays a single-user SQLite app. Nothing is served on Vercel until these environment variables are set:
+Production uses Supabase Postgres and Supabase Auth. The original SQLite file stays on this machine and is not deleted.
+
+Required environment variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `ALLOWED_EMAIL` — the only account that can sign in
-- `DATABASE_URL` — Supabase Postgres connection string, replacing the SQLite URL
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+- `ALLOWED_EMAIL` — the only account that can open the records
+- `DATABASE_URL` — pooled Postgres URL
+- `DIRECT_URL` — session Postgres URL used by Prisma
 - `FORGE_REQUIRE_AUTH=true` on any public host that is not Vercel
 
-Create the Supabase project, turn off public signups, run `prisma/supabase-lock.sql` in the SQL editor, then `npx prisma db push` against that database. Import a JSON backup from Settings and compare the counts with the private backup before you rely on it. `scripts/migrate-to-postgres.mjs` prints those steps and does not delete `data/forge.db`.
-
-The anon key is public and is used only for sign-in. Fitness rows are read through the server. Row level security in `prisma/supabase-lock.sql` blocks the public Supabase API. Do not put the service-role key in any `NEXT_PUBLIC_` variable.
+The publishable key is public and is used only for sign-in. Fitness rows are read through the server. `prisma/supabase-lock.sql` enables row level security with no public policies. Do not put a secret or service-role key in any `NEXT_PUBLIC_` variable. Leave `FORGE_PRIVATE_DEPLOYMENT` false. Progress photos stay on the local disk.
 
 ## Deferred
 
-- Accounts and authentication
-- A PostgreSQL migration (the schema uses portable Prisma types; the provider is still SQLite)
 - USDA branded foods
 - A dedicated side-by-side photo viewer (photos are a private grid)
 - AI-generated insights (insights are rules over stored records)

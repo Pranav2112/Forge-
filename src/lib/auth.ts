@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { supabasePublishableKey, supabaseUrl } from "@/lib/supabase-env";
 
 export function authRequired() {
-  return process.env.VERCEL === "1" || process.env.FORGE_REQUIRE_AUTH === "true" || Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  return process.env.VERCEL === "1" || process.env.FORGE_REQUIRE_AUTH === "true" || Boolean(supabaseUrl());
 }
 
 export function allowedEmail(email: string | null | undefined) {
@@ -12,8 +13,8 @@ export function allowedEmail(email: string | null | undefined) {
 }
 
 export async function currentUser() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = supabaseUrl();
+  const key = supabasePublishableKey();
   if (!url || !key) return null;
   try {
   const cookieStore = await cookies();

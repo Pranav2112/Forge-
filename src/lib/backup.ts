@@ -394,11 +394,16 @@ export async function importBackup(
 
       const many = async (rows: unknown[], write: (row: never) => Promise<unknown>) => {
         for (const row of rows) {
+          if (skip) await tx.$executeRawUnsafe("SAVEPOINT forge_import_row");
           try {
             await write(row as never);
+            if (skip) await tx.$executeRawUnsafe("RELEASE SAVEPOINT forge_import_row");
           } catch (error) {
             const code = typeof error === "object" && error && "code" in error ? String((error as { code: string }).code) : "";
-            if (skip && (code === "P2002" || code === "P2003")) continue;
+            if (skip && (code === "P2002" || code === "P2003")) {
+              await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT forge_import_row");
+              continue;
+            }
             throw error;
           }
         }
@@ -434,11 +439,16 @@ export async function importBackup(
       for (const photo of data.photos) {
         const { bytesBase64, ...row } = photo;
         const filename = safePhotoName(row.filename);
+        if (skip) await tx.$executeRawUnsafe("SAVEPOINT forge_import_row");
         try {
           await tx.progressPhoto.create({ data: asDate({ ...row, filename }, ["createdAt"]) as never });
+          if (skip) await tx.$executeRawUnsafe("RELEASE SAVEPOINT forge_import_row");
         } catch (error) {
           const code = typeof error === "object" && error && "code" in error ? String((error as { code: string }).code) : "";
-          if (skip && code === "P2002") continue;
+          if (skip && code === "P2002") {
+            await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT forge_import_row");
+            continue;
+          }
           throw error;
         }
         if (bytesBase64) {
