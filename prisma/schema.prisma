@@ -1,0 +1,441 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Single local profile. Historical logs do not live on this row.
+model UserProfile {
+  id                   String   @id @default("default")
+  name                 String
+  age                  Int
+  sex                  String
+  heightCm             Float
+  diet                 String
+  allowedFoods         String
+  excludedFoods        String
+  baselineWeightKg     Float
+  baselineWaistCm      Float
+  abdominalDefinition  String
+  timezone             String   @default("America/New_York")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model UserSettings {
+  id               String @id @default("default")
+  weightUnit       String @default("kg")
+  lengthUnit       String @default("cm")
+  distanceUnit     String @default("km")
+  restTimerSeconds Int    @default(90)
+  usdaApiKey       String @default("")
+  catalogVersion   Int    @default(0)
+  ownerId          String @default("")
+}
+
+/// A target that applies from effectiveFrom until a later row replaces it.
+model NutritionTarget {
+  id            String   @id @default(cuid())
+  effectiveFrom String
+  calories      Int
+  proteinG      Float
+  carbsG        Float
+  fatG          Float
+  fiberG        Float    @default(30)
+  steps         Int
+  waterMl       Int
+  notes         String   @default("")
+  createdAt     DateTime @default(now())
+
+  @@index([effectiveFrom])
+}
+
+model Goal {
+  id            String   @id @default(cuid())
+  name          String
+  category      String
+  direction     String   @default("decrease")
+  startingValue Float?
+  targetValue   Float?
+  currentValue  Float?
+  unit          String   @default("")
+  startText     String   @default("")
+  targetText    String   @default("")
+  startDate     String
+  targetDate    String?
+  status        String   @default("active")
+  notes         String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Food {
+  id              String   @id @default(cuid())
+  name            String
+  brand           String   @default("")
+  servingSize     Float
+  servingUnit     String
+  gramsPerServing Float?
+  calories        Float
+  proteinG        Float
+  carbsG          Float
+  fatG            Float
+  fiberG          Float    @default(0)
+  sugarG          Float    @default(0)
+  sodiumMg        Float    @default(0)
+  hasSodium       Boolean  @default(false)
+  source          String
+  isEstimate      Boolean  @default(false)
+  isFavorite      Boolean  @default(false)
+  preparation     String   @default("")
+  notes           String   @default("")
+  aliases         String   @default("")
+  seedKey         String?  @unique
+  catalogManaged  Boolean  @default(false)
+  saturatedFatG   Float    @default(0)
+  cholesterolMg   Float    @default(0)
+  calciumMg       Float    @default(0)
+  ironMg          Float    @default(0)
+  potassiumMg     Float    @default(0)
+  bcaaG           Float    @default(0)
+  fiberLessThan   Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  recipeIngredients RecipeIngredient[]
+  savedMealItems    SavedMealItem[]
+
+  @@index([name])
+  @@index([isFavorite])
+}
+
+model Recipe {
+  id          String             @id @default(cuid())
+  name        String
+  servings    Float              @default(1)
+  notes       String             @default("")
+  ingredients RecipeIngredient[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model RecipeIngredient {
+  id       String @id @default(cuid())
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  foodId   String
+  food     Food   @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  quantity Float
+  unit     String
+
+  @@index([recipeId])
+  @@index([foodId])
+}
+
+model SavedMeal {
+  id        String          @id @default(cuid())
+  name      String
+  mealType  String          @default("breakfast")
+  notes     String          @default("")
+  items     SavedMealItem[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model SavedMealItem {
+  id          String    @id @default(cuid())
+  savedMealId String
+  savedMeal   SavedMeal @relation(fields: [savedMealId], references: [id], onDelete: Cascade)
+  foodId      String
+  food        Food      @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  quantity    Float
+  unit        String
+
+  @@index([savedMealId])
+  @@index([foodId])
+}
+
+model MealEntry {
+  id        String     @id @default(cuid())
+  date      String
+  mealType  String
+  notes     String     @default("")
+  items     MealItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([date, mealType])
+  @@index([date])
+}
+
+/// Snapshot of nutrition at log time. Editing the food later does not rewrite these numbers.
+model MealItem {
+  id          String    @id @default(cuid())
+  mealEntryId String
+  mealEntry   MealEntry @relation(fields: [mealEntryId], references: [id], onDelete: Cascade)
+  foodId      String?
+  recipeId    String?
+  name        String
+  brand       String    @default("")
+  quantity    Float
+  unit        String
+  calories    Float
+  proteinG    Float
+  carbsG      Float
+  fatG        Float
+  fiberG      Float     @default(0)
+  sugarG      Float     @default(0)
+  sodiumMg      Float     @default(0)
+  hasSodium     Boolean   @default(false)
+  saturatedFatG Float     @default(0)
+  cholesterolMg Float     @default(0)
+  calciumMg     Float     @default(0)
+  ironMg        Float     @default(0)
+  potassiumMg   Float     @default(0)
+  bcaaG         Float     @default(0)
+  fiberLessThan Boolean   @default(false)
+  isEstimate    Boolean   @default(false)
+  preparation   String    @default("")
+  createdAt     DateTime  @default(now())
+
+  @@index([mealEntryId])
+  @@index([foodId])
+  @@index([createdAt])
+}
+
+model Exercise {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  primaryMuscle    String
+  secondaryMuscles String   @default("[]")
+  equipment        String
+  exerciseType     String
+  instructions     String   @default("")
+  demoUrl          String   @default("")
+  notes            String   @default("")
+  tracksLoad       Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  plannedExercises PlannedExercise[]
+  workoutExercises WorkoutExercise[]
+
+  @@index([primaryMuscle])
+  @@index([exerciseType])
+}
+
+model TrainingPlan {
+  id        String            @id @default(cuid())
+  name      String
+  isActive  Boolean           @default(false)
+  notes     String            @default("")
+  days      TrainingPlanDay[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model TrainingPlanDay {
+  id        String            @id @default(cuid())
+  planId    String
+  plan      TrainingPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  dayOfWeek Int
+  name      String
+  focus     String            @default("")
+  notes     String            @default("")
+  exercises PlannedExercise[]
+
+  @@unique([planId, dayOfWeek])
+}
+
+model PlannedExercise {
+  id         String          @id @default(cuid())
+  dayId      String
+  day        TrainingPlanDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise        @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sortOrder  Int
+  targetSets Int?
+  targetReps String          @default("")
+  notes      String          @default("")
+
+  @@index([dayId])
+  @@index([exerciseId])
+}
+
+model WorkoutSession {
+  id                 String            @id @default(cuid())
+  date               String
+  name               String
+  planDayId          String?
+  status             String            @default("active")
+  startedAt          DateTime          @default(now())
+  finishedAt         DateTime?
+  pausedAt           DateTime?
+  accumulatedPauseMs Int               @default(0)
+  notes              String            @default("")
+  exercises          WorkoutExercise[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([date])
+  @@index([status])
+}
+
+model WorkoutExercise {
+  id         String         @id @default(cuid())
+  sessionId  String
+  session    WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sortOrder  Int
+  notes      String         @default("")
+  sets       ExerciseSet[]
+
+  @@index([sessionId])
+  @@index([exerciseId])
+}
+
+model ExerciseSet {
+  id                String          @id @default(cuid())
+  workoutExerciseId String
+  workoutExercise   WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
+  setNumber         Int
+  weight            Float?
+  weightUnit        String          @default("kg")
+  reps              Int?
+  rpe               Float?
+  rir               Float?
+  restSeconds       Int?
+  setType           String          @default("working")
+  durationSeconds   Int?
+  distanceM         Float?
+  notes             String          @default("")
+  completed         Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+
+  @@index([workoutExerciseId])
+}
+
+model CardioSession {
+  id               String   @id @default(cuid())
+  date             String
+  activity         String
+  distanceKm       Float?
+  durationSeconds  Int
+  incline          Float?
+  avgHeartRate     Int?
+  caloriesBurned   Float?
+  caloriesAreEstimate Boolean @default(false)
+  notes            String   @default("")
+  createdAt        DateTime @default(now())
+
+  @@index([date])
+  @@index([activity])
+}
+
+model HyroxSession {
+  id                     String         @id @default(cuid())
+  date                   String
+  name                   String
+  kind                   String
+  notes                  String         @default("")
+  isCompleteSimulation   Boolean        @default(false)
+  segments               HyroxSegment[]
+  createdAt              DateTime       @default(now())
+
+  @@index([date])
+  @@index([kind])
+}
+
+model HyroxSegment {
+  id              String       @id @default(cuid())
+  sessionId       String
+  session         HyroxSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sortOrder       Int
+  segmentType     String
+  station         String       @default("")
+  distanceM       Float?
+  reps            Int?
+  weightKg        Float?
+  durationSeconds Int?
+  notes           String       @default("")
+
+  @@index([sessionId])
+  @@index([station])
+}
+
+model BodyWeightEntry {
+  id               String   @id @default(cuid())
+  date             String
+  weighedAt        DateTime @default(now())
+  weightKg         Float
+  isRepresentative Boolean  @default(true)
+  notes            String   @default("")
+
+  @@index([date])
+}
+
+model BodyMeasurement {
+  id             String   @id @default(cuid())
+  date           String
+  waistCm        Float?
+  chestCm        Float?
+  hipsCm         Float?
+  neckCm         Float?
+  leftArmCm      Float?
+  rightArmCm     Float?
+  leftThighCm    Float?
+  rightThighCm   Float?
+  leftCalfCm     Float?
+  rightCalfCm    Float?
+  bodyFatPercent Float?
+  bodyFatMethod  String   @default("")
+  notes          String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([date])
+}
+
+model ProgressPhoto {
+  id        String   @id @default(cuid())
+  date      String
+  angle     String
+  filename  String
+  mimeType  String
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+model WaterEntry {
+  id       String   @id @default(cuid())
+  date     String
+  amountMl Int
+  loggedAt DateTime @default(now())
+
+  @@index([date])
+}
+
+model StepEntry {
+  id       String   @id @default(cuid())
+  date     String
+  steps    Int
+  notes    String   @default("")
+  loggedAt DateTime @default(now())
+
+  @@index([date])
+}
+
+model ImportLog {
+  id         String   @id @default(cuid())
+  checksum   String
+  importedAt DateTime @default(now())
+  mode       String
+  summary    String
+
+  @@index([checksum])
+}
