@@ -35,10 +35,10 @@ const NAV = [
 ];
 
 const MOBILE = [
-  { href: "/", label: "Home", icon: LayoutDashboard },
+  { href: "/", label: "Today", icon: LayoutDashboard },
+  { href: "/workouts", label: "Workout", icon: Dumbbell },
   { href: "/nutrition", label: "Food", icon: Utensils },
-  { href: "/workouts", label: "Train", icon: Dumbbell },
-  { href: "/body", label: "Body", icon: Scale },
+  { href: "/body", label: "Progress", icon: Scale },
 ];
 
 const listeners = new Set<() => void>();
@@ -138,11 +138,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className={cn("min-h-screen pb-24 transition-[padding] md:pb-0", collapsed ? "md:pl-[76px]" : "md:pl-60")}>
+      <div className={cn("min-h-screen pb-32 transition-[padding] md:pb-0", collapsed ? "md:pl-[76px]" : "md:pl-60")}>
         <div className="mx-auto w-full max-w-6xl px-4 py-5 md:px-8 md:py-8">{children}</div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur md:hidden" aria-label="Mobile">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="Mobile">
         <div className="grid grid-cols-5">
           {MOBILE.map((item) => {
             const Icon = item.icon;

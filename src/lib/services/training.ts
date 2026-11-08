@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { fail, prismaMessage } from "@/lib/result";
 import { cardioSchema, setSchema } from "@/lib/validators";
 
-export async function startWorkout(input: { date: string; planDayId?: string | null; name?: string }) {
+export async function startWorkout(input: { date: string; planDayId?: string | null; name?: string; repeatFromId?: string | null }) {
   const active = await prisma.workoutSession.findFirst({
     where: { status: { in: ["active", "paused"] } },
   });
@@ -13,7 +13,18 @@ export async function startWorkout(input: { date: string; planDayId?: string | n
 
   let name = input.name?.trim() || "Workout";
   let exercises: { exerciseId: string; sortOrder: number }[] = [];
-  if (input.planDayId) {
+  if (input.repeatFromId) {
+    const previous = await prisma.workoutSession.findUnique({
+      where: { id: input.repeatFromId },
+      include: { exercises: { orderBy: { sortOrder: "asc" } } },
+    });
+    if (!previous) return fail("That workout is no longer available.");
+    if (!input.name?.trim()) name = previous.name;
+    exercises = previous.exercises.map((exercise, index) => ({
+      exerciseId: exercise.exerciseId,
+      sortOrder: index,
+    }));
+  } else if (input.planDayId) {
     const day = await prisma.trainingPlanDay.findUnique({
       where: { id: input.planDayId },
       include: { exercises: { orderBy: { sortOrder: "asc" } } },

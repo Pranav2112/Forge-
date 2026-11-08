@@ -157,7 +157,7 @@ export async function searchUsdaAction(query: string) {
   }
 }
 
-export async function startWorkoutAction(input: { date: string; planDayId?: string | null; name?: string }) {
+export async function startWorkoutAction(input: { date: string; planDayId?: string | null; name?: string; repeatFromId?: string | null }) {
   await ready();
   return done(await training.startWorkout(input));
 }

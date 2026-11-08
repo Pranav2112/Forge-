@@ -12,18 +12,25 @@ export function StartWorkout({
   date,
   planDay,
   activeId,
+  lastCompleted,
 }: {
   date: string;
   planDay: { id: string; name: string } | null;
   activeId: string | null;
+  lastCompleted?: { id: string; name: string } | null;
 }) {
   const router = useRouter();
   const { pending, error, run } = useAction();
   const [name, setName] = useState("");
 
-  function start(planDayId?: string) {
+  function start(options?: { planDayId?: string; repeatFromId?: string }) {
     run(async () => {
-      const result = await startWorkoutAction({ date, planDayId: planDayId ?? null, name: name || undefined });
+      const result = await startWorkoutAction({
+        date,
+        planDayId: options?.planDayId ?? null,
+        repeatFromId: options?.repeatFromId ?? null,
+        name: name || undefined,
+      });
       if (result.ok && "data" in result && result.data?.id) router.push(`/workouts/${result.data.id}`);
       return result;
     });
@@ -43,14 +50,19 @@ export function StartWorkout({
         <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={planDay?.name ?? "Workout"} />
       </Field>
       <div className="flex flex-wrap gap-2">
+        <Button type="button" className="h-11" variant="outline" disabled={pending} onClick={() => start()}>
+          Start empty workout
+        </Button>
         {planDay ? (
-          <Button type="button" disabled={pending} onClick={() => start(planDay.id)}>
+          <Button type="button" className="h-11" disabled={pending} onClick={() => start({ planDayId: planDay.id })}>
             Start {planDay.name}
           </Button>
         ) : null}
-        <Button type="button" variant="outline" disabled={pending} onClick={() => start()}>
-          Start empty workout
-        </Button>
+        {lastCompleted ? (
+          <Button type="button" className="h-11" variant="secondary" disabled={pending} onClick={() => start({ repeatFromId: lastCompleted.id })}>
+            Repeat {lastCompleted.name}
+          </Button>
+        ) : null}
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>

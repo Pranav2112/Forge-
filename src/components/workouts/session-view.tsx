@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { canEstimate1RM, elapsedWorkoutMs, formatDuration } from "@/lib/calc";
-import { SET_TYPES } from "@/lib/constants";
+import { MUSCLE_GROUPS, SET_TYPES } from "@/lib/constants";
 import { grams } from "@/lib/format";
-import { setSchema } from "@/lib/validators";
 import {
   addExerciseToWorkoutAction,
   addSetAction,
@@ -18,10 +15,11 @@ import {
   updateWorkoutMetaAction,
 } from "@/lib/actions";
 import { useAction } from "@/components/use-action";
-import { Field, NativeSelect } from "@/components/bits";
+import { Field } from "@/components/bits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 
 type SetRow = {
@@ -79,7 +77,7 @@ export function SessionView({
     accumulatedPauseMs: number;
     exercises: ExerciseBlock[];
   };
-  library: { id: string; name: string; primaryMuscle: string; tracksLoad: boolean; exerciseType: string }[];
+  library: { id: string; name: string; primaryMuscle: string; secondaryMuscles: string; equipment: string; tracksLoad: boolean; exerciseType: string }[];
   weightUnit: string;
   restDefault: number;
 }) {
@@ -87,7 +85,7 @@ export function SessionView({
   const { pending, run } = useAction();
   const [now, setNow] = useState(() => Date.now());
   const [notes, setNotes] = useState(session.notes);
-  const [exerciseId, setExerciseId] = useState(library[0]?.id ?? "");
+  const [restKick, setRestKick] = useState(0);
 
   useEffect(() => {
     if (session.status === "completed") return;
@@ -142,7 +140,7 @@ export function SessionView({
         </div>
       </div>
 
-      <RestTimer defaultSeconds={restDefault} />
+      <RestTimer defaultSeconds={restDefault} kick={restKick} />
 
       <div className="grid gap-2">
         <Field label="Workout name">
@@ -157,23 +155,16 @@ export function SessionView({
       </div>
 
       {session.status !== "completed" ? (
-        <div className="flex flex-wrap items-end gap-2">
-          <Field label="Add exercise">
-            <NativeSelect className="min-w-56" value={exerciseId} onChange={(event) => setExerciseId(event.target.value)}>
-              {library.map((exercise) => (
-                <option key={exercise.id} value={exercise.id}>{exercise.name}</option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Button type="button" variant="secondary" disabled={pending || !exerciseId} onClick={() => run(() => addExerciseToWorkoutAction({ sessionId: session.id, exerciseId }), "Exercise added")}>
-            Add
-          </Button>
-        </div>
+        <ExercisePicker
+          library={library}
+          pending={pending}
+          onAdd={(exerciseId) => run(() => addExerciseToWorkoutAction({ sessionId: session.id, exerciseId }), "Exercise added")}
+        />
       ) : null}
 
       <div className="grid gap-4">
         {session.exercises.map((block) => (
-          <ExerciseCard key={block.id} block={block} open={session.status !== "completed"} weightUnit={weightUnit} pending={pending} run={run} />
+          <ExerciseCard key={block.id} block={block} open={session.status !== "completed"} weightUnit={weightUnit} pending={pending} run={run} onLogged={() => setRestKick((value) => value + 1)} />
         ))}
       </div>
     </div>
@@ -186,12 +177,14 @@ function ExerciseCard({
   weightUnit,
   pending,
   run,
+  onLogged,
 }: {
   block: ExerciseBlock;
   open: boolean;
   weightUnit: string;
   pending: boolean;
   run: ReturnType<typeof useAction>["run"];
+  onLogged: () => void;
 }) {
   const showEstimate = canEstimate1RM(block.exercise);
   return (
@@ -274,112 +267,177 @@ function ExerciseCard({
           Repeat last set
         </Button>
       ) : null}
-      {open ? <SetForm workoutExerciseId={block.id} tracksLoad={block.exercise.tracksLoad} weightUnit={weightUnit === "lb" ? "lb" : "kg"} /> : null}
+      {open ? (
+        <QuickSet
+          block={block}
+          tracksLoad={block.exercise.tracksLoad}
+          weightUnit={weightUnit === "lb" ? "lb" : "kg"}
+          pending={pending}
+          run={run}
+          onLogged={onLogged}
+        />
+      ) : null}
     </section>
   );
 }
 
-function SetForm({ workoutExerciseId, tracksLoad, weightUnit }: { workoutExerciseId: string; tracksLoad: boolean; weightUnit: "kg" | "lb" }) {
-  const { pending, run } = useAction();
-  const form = useForm({
-    resolver: zodResolver(setSchema),
-    defaultValues: {
-      workoutExerciseId,
-      weight: undefined as number | undefined,
-      weightUnit,
-      reps: undefined as number | undefined,
-      rpe: undefined as number | undefined,
-      rir: undefined as number | undefined,
-      setType: "working" as const,
-      durationSeconds: undefined as number | undefined,
-      distanceM: undefined as number | undefined,
-      notes: "",
-    },
-  });
+function QuickSet({
+  block,
+  tracksLoad,
+  weightUnit,
+  pending,
+  run,
+  onLogged,
+}: {
+  block: ExerciseBlock;
+  tracksLoad: boolean;
+  weightUnit: "kg" | "lb";
+  pending: boolean;
+  run: ReturnType<typeof useAction>["run"];
+  onLogged: () => void;
+}) {
+  const last = block.sets[block.sets.length - 1];
+  const prior = block.previous?.sets[0];
+  const [weight, setWeight] = useState(last?.weight != null ? String(last.weight) : prior?.weight != null ? String(prior.weight) : "");
+  const [reps, setReps] = useState(last?.reps != null ? String(last.reps) : prior?.reps != null ? String(prior.reps) : "");
+  const [duration, setDuration] = useState(last?.durationSeconds != null ? String(last.durationSeconds) : "");
+  const [distance, setDistance] = useState(last?.distanceM != null ? String(last.distanceM) : "");
+  const [setType, setSetType] = useState("working");
+  const [unit, setUnit] = useState<"kg" | "lb">(last?.weightUnit === "lb" ? "lb" : weightUnit);
+
+  function log() {
+    run(async () => {
+      const result = await addSetAction({
+        workoutExerciseId: block.id,
+        weight: tracksLoad && weight !== "" ? Number(weight) : null,
+        weightUnit: unit,
+        reps: reps !== "" ? Number(reps) : null,
+        setType,
+        rpe: null,
+        rir: null,
+        durationSeconds: !tracksLoad && duration !== "" ? Number(duration) : null,
+        distanceM: !tracksLoad && distance !== "" ? Number(distance) : null,
+        notes: "",
+      });
+      if (result.ok) onLogged();
+      return result;
+    }, "Set logged");
+  }
 
   return (
-    <form
-      className="mt-3 grid gap-2 md:grid-cols-4"
-      onSubmit={form.handleSubmit((values) => {
-        run(async () => {
-          const result = await addSetAction({
-            ...values,
-            weight: Number.isFinite(values.weight) ? values.weight : null,
-            reps: Number.isFinite(values.reps) ? values.reps : null,
-            rpe: Number.isFinite(values.rpe) ? values.rpe : null,
-            rir: Number.isFinite(values.rir) ? values.rir : null,
-            durationSeconds: Number.isFinite(values.durationSeconds) ? values.durationSeconds : null,
-            distanceM: Number.isFinite(values.distanceM) ? values.distanceM : null,
-          });
-          if (result.ok && "data" in result && result.data?.estimatedPr) {
-            return { ok: true };
-          }
-          return result;
-        }, "Set logged");
-        form.reset({ ...form.getValues(), weight: undefined, reps: undefined, notes: "" });
-      })}
-    >
-      <input type="hidden" {...form.register("workoutExerciseId")} />
-      <Field label="Type">
-        <NativeSelect {...form.register("setType")}>
-          {SET_TYPES.map((type) => (
-            <option key={type.id} value={type.id}>{type.label}</option>
-          ))}
-        </NativeSelect>
-      </Field>
-      {tracksLoad ? (
-        <>
-          <Field label="Weight">
-            <Input type="number" step="any" {...form.register("weight", { setValueAs: emptyNumber })} />
-          </Field>
-          <Field label="Unit">
-            <NativeSelect {...form.register("weightUnit")}>
-              <option value="kg">kg</option>
-              <option value="lb">lb</option>
-            </NativeSelect>
-          </Field>
-          <Field label="Reps">
-            <Input type="number" {...form.register("reps", { setValueAs: emptyNumber })} />
-          </Field>
-        </>
-      ) : (
-        <>
-          <Field label="Duration (sec)">
-            <Input type="number" {...form.register("durationSeconds", { setValueAs: emptyNumber })} />
-          </Field>
-          <Field label="Distance (m)">
-            <Input type="number" step="any" {...form.register("distanceM", { setValueAs: emptyNumber })} />
-          </Field>
-          <Field label="Reps">
-            <Input type="number" {...form.register("reps", { setValueAs: emptyNumber })} />
-          </Field>
-        </>
-      )}
-      <Field label="RPE">
-        <Input type="number" step="0.5" {...form.register("rpe", { setValueAs: emptyNumber })} />
-      </Field>
-      <Field label="RIR">
-        <Input type="number" step="0.5" {...form.register("rir", { setValueAs: emptyNumber })} />
-      </Field>
-      <div className="md:col-span-4">
-        <Button type="submit" disabled={pending}>Log set</Button>
-        {!tracksLoad ? <p className="mt-2 text-xs text-muted-foreground">Estimated 1RM is not calculated for this exercise.</p> : (
-          <p className="mt-2 text-xs text-muted-foreground">Estimated 1RM uses Epley and only for 1–12 reps. It is not a tested max.</p>
+    <div className="mt-3 grid gap-2">
+      <div className="flex gap-1 overflow-x-auto">
+        {SET_TYPES.map((type) => (
+          <Button key={type.id} type="button" size="sm" variant={setType === type.id ? "default" : "outline"} onClick={() => setSetType(type.id)}>
+            {type.label}
+          </Button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {tracksLoad ? (
+          <>
+            <Field label={`Weight (${unit})`}>
+              <Input inputMode="decimal" value={weight} onChange={(event) => setWeight(event.target.value)} aria-label="Weight" />
+            </Field>
+            <Field label="Reps">
+              <Input inputMode="numeric" value={reps} onChange={(event) => setReps(event.target.value)} aria-label="Reps" />
+            </Field>
+          </>
+        ) : (
+          <>
+            <Field label="Seconds">
+              <Input inputMode="numeric" value={duration} onChange={(event) => setDuration(event.target.value)} aria-label="Duration seconds" />
+            </Field>
+            <Field label="Meters">
+              <Input inputMode="decimal" value={distance} onChange={(event) => setDistance(event.target.value)} aria-label="Distance meters" />
+            </Field>
+          </>
         )}
       </div>
-    </form>
+      <div className="sticky bottom-20 z-20 flex gap-2 bg-card py-2">
+        {tracksLoad ? (
+          <Button type="button" variant="outline" className="h-11" onClick={() => setUnit(unit === "kg" ? "lb" : "kg")}>{unit}</Button>
+        ) : null}
+        <Button type="button" className="h-11 flex-1" disabled={pending} onClick={log}>Log set</Button>
+      </div>
+    </div>
   );
 }
 
-function emptyNumber(value: unknown) {
-  if (value === "" || value == null) return undefined;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : undefined;
+function ExercisePicker({
+  library,
+  pending,
+  onAdd,
+}: {
+  library: { id: string; name: string; primaryMuscle: string; secondaryMuscles: string; equipment: string }[];
+  pending: boolean;
+  onAdd: (exerciseId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [muscle, setMuscle] = useState("All");
+  const [equipment, setEquipment] = useState("All");
+  const equipmentOptions = ["All", ...Array.from(new Set(library.map((exercise) => exercise.equipment))).sort()];
+  const muscles = ["All", ...MUSCLE_GROUPS];
+  const needle = query.trim().toLowerCase();
+  const results = library.filter((exercise) => {
+    const musclesText = `${exercise.primaryMuscle} ${exercise.secondaryMuscles}`.toLowerCase();
+    if (muscle !== "All" && !musclesText.includes(muscle.toLowerCase())) return false;
+    if (equipment !== "All" && exercise.equipment !== equipment) return false;
+    if (!needle) return true;
+    return `${exercise.name} ${exercise.equipment} ${musclesText}`.toLowerCase().includes(needle);
+  }).slice(0, 40);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger render={<Button type="button" className="h-11" />}>Add exercise</SheetTrigger>
+      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+        <SheetHeader>
+          <SheetTitle>Add exercise</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-3 px-4 pb-4">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search bench, pulldown, squat…" aria-label="Search exercises" />
+          <div className="flex gap-1 overflow-x-auto">
+            {muscles.map((item) => (
+              <Button key={item} type="button" size="sm" variant={muscle === item ? "default" : "outline"} onClick={() => setMuscle(item)}>{item}</Button>
+            ))}
+          </div>
+          <div className="flex gap-1 overflow-x-auto">
+            {equipmentOptions.map((item) => (
+              <Button key={item} type="button" size="sm" variant={equipment === item ? "default" : "outline"} onClick={() => setEquipment(item)}>{item}</Button>
+            ))}
+          </div>
+          <div className="grid gap-2">
+            {results.length === 0 ? <p className="text-sm text-muted-foreground">No exercises match.</p> : results.map((exercise) => (
+              <button
+                key={exercise.id}
+                type="button"
+                disabled={pending}
+                className="flex min-h-11 items-center justify-between rounded-xl border border-border px-3 py-2 text-left text-sm"
+                onClick={() => {
+                  onAdd(exercise.id);
+                  setOpen(false);
+                }}
+              >
+                <span className="font-medium">{exercise.name}</span>
+                <span className="text-xs text-muted-foreground">{exercise.primaryMuscle} · {exercise.equipment}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
-function RestTimer({ defaultSeconds }: { defaultSeconds: number }) {
+function RestTimer({ defaultSeconds, kick }: { defaultSeconds: number; kick: number }) {
   const [chosen, setChosen] = useState(defaultSeconds);
   const [left, setLeft] = useState<number | null>(null);
+  const [seenKick, setSeenKick] = useState(kick);
+  if (kick !== seenKick) {
+    setSeenKick(kick);
+    if (kick > 0) setLeft(chosen);
+  }
 
   useEffect(() => {
     if (left == null) return;

@@ -28,7 +28,12 @@ async function Workouts() {
         <Card>
           <CardHeader><CardTitle>Start</CardTitle></CardHeader>
           <CardContent>
-            <StartWorkout date={data.today} planDay={data.planDay} activeId={data.active?.id ?? null} />
+            <StartWorkout
+              date={data.today}
+              planDay={data.planDay}
+              activeId={data.active?.id ?? null}
+              lastCompleted={data.sessions.find((session) => session.status === "completed") ?? null}
+            />
           </CardContent>
         </Card>
         <Card>

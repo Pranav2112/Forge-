@@ -551,6 +551,8 @@ export async function getWorkout(id: string) {
       id: exercise.id,
       name: exercise.name,
       primaryMuscle: exercise.primaryMuscle,
+      secondaryMuscles: exercise.secondaryMuscles,
+      equipment: exercise.equipment,
       tracksLoad: exercise.tracksLoad,
       exerciseType: exercise.exerciseType,
     })),

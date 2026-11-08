@@ -156,6 +156,33 @@ export function FoodLogger({
           Add food
         </Button>
       </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {results.filter((item) => item.isFavorite || recentIds.includes(item.id)).slice(0, 8).map((item) => (
+          <Button
+            key={item.id}
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => {
+              choose(item);
+              run(async () => {
+                const result = await logFoodAction({
+                  date,
+                  mealType,
+                  foodId: item.id,
+                  quantity: item.servingSize,
+                  unit: item.servingUnit,
+                });
+                if (result.ok) resetSearch();
+                return result;
+              }, `${item.name} logged`);
+            }}
+          >
+            {item.name}
+          </Button>
+        ))}
+      </div>
       <div className="flex flex-wrap gap-2">
         {whey ? (
           <>
