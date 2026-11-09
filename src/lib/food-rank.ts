@@ -27,6 +27,18 @@ const QUERY_ALIASES: Record<string, string> = {
   daal: "dal",
 };
 
+function matchGroups(raw: string): string[][] {
+  const groups = [raw.split(/\s+/).filter(Boolean)];
+  const direct = QUERY_ALIASES[raw];
+  if (direct) groups.push(direct.split(/\s+/).filter(Boolean));
+  if (raw.length >= 3) {
+    for (const [key, value] of Object.entries(QUERY_ALIASES)) {
+      if (key.startsWith(raw) && key !== raw) groups.push(value.split(/\s+/).filter(Boolean));
+    }
+  }
+  return groups;
+}
+
 export function rankFoods<T extends RankableFood>(
   foods: T[],
   query: string,
@@ -44,8 +56,7 @@ export function rankFoods<T extends RankableFood>(
       .slice(0, 8);
   }
 
-  const expanded = `${raw} ${QUERY_ALIASES[raw] ?? ""}`.trim();
-  const terms = expanded.split(/\s+/).filter(Boolean);
+  const groups = matchGroups(raw);
 
   const scored = foods
     .map((food) => {
@@ -54,11 +65,11 @@ export function rankFoods<T extends RankableFood>(
       const aliases = (food.aliases ?? "").toLowerCase();
       const prep = food.preparation.toLowerCase();
       const haystack = `${name} ${brand} ${aliases} ${prep}`;
-      let score = 0;
+      if (!groups.some((terms) => terms.every((term) => haystack.includes(term)))) return { food, score: 0 };
+      let score = 50;
       if (name === raw || aliases.split(",").some((alias) => alias.trim() === raw)) score += 120;
       if (name.startsWith(raw)) score += 40;
-      if (!terms.every((term) => haystack.includes(term))) return { food, score: 0 };
-      score += 50;
+      if (name.split(/[^a-z0-9]+/).some((word) => word.startsWith(raw))) score += 30;
       if (food.isFavorite) score += 8;
       if (recentIds.includes(food.id)) score += 6;
       if (frequentIds.includes(food.id)) score += 4;

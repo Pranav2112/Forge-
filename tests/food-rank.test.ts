@@ -29,4 +29,46 @@ describe("food search", () => {
     assert.equal(empty[0]?.id, "rice");
     assert.ok(empty.some((food) => food.id === "dal"));
   });
+
+  it("matches partial names without requiring the alias words too", () => {
+    const catalog = [
+      ...foods,
+      { id: "brown", name: "Brown rice", brand: "", aliases: "brown rice", preparation: "cooked", isFavorite: false, calories: 123, proteinG: 2.7, servingSize: 100, servingUnit: "g" },
+      { id: "poha", name: "Poha", brand: "", aliases: "poha, flattened rice", preparation: "cooked", isFavorite: false, calories: 130, proteinG: 2.5, servingSize: 100, servingUnit: "g" },
+      { id: "kanda", name: "Kanda Poha", brand: "", aliases: "kanda poha", preparation: "cooked", isFavorite: false, calories: 150, proteinG: 3, servingSize: 100, servingUnit: "g" },
+      { id: "coffee", name: "Coffee", brand: "", aliases: "coffee", preparation: "brewed", isFavorite: false, calories: 2, proteinG: 0.1, servingSize: 240, servingUnit: "ml" },
+      { id: "coffee-milk", name: "Coffee with milk", brand: "", aliases: "coffee with milk", preparation: "prepared", isFavorite: true, calories: 40, proteinG: 2, servingSize: 240, servingUnit: "ml" },
+    ];
+    const riceIds = rankFoods(catalog, "ric").map((food) => food.id);
+    assert.ok(riceIds.includes("rice"));
+    assert.ok(riceIds.includes("brown"));
+    assert.ok(rankFoods(catalog, "rice").some((food) => food.id === "brown"));
+    const poh = rankFoods(catalog, "poh").map((food) => food.id);
+    assert.ok(poh.includes("poha"));
+    assert.ok(poh.includes("kanda"));
+    const coffee = rankFoods(catalog, "cof").map((food) => food.id);
+    assert.ok(coffee.includes("coffee"));
+    assert.ok(coffee.includes("coffee-milk"));
+    assert.equal(coffee.includes("rice"), false);
+  });
+
+  it("ranks a few hundred foods without a noticeable delay", () => {
+    const catalog = Array.from({ length: 400 }, (_, index) => ({
+      id: `f${index}`,
+      name: index === 12 ? "Cooked white rice" : `Food ${index}`,
+      brand: "",
+      aliases: "",
+      preparation: "",
+      isFavorite: false,
+      calories: 100,
+      proteinG: 5,
+      servingSize: 100,
+      servingUnit: "g",
+    }));
+    const started = performance.now();
+    const ranked = rankFoods(catalog, "ric");
+    const elapsed = performance.now() - started;
+    assert.equal(ranked[0]?.id, "f12");
+    assert.ok(elapsed < 20, `ranking took ${elapsed.toFixed(1)} ms`);
+  });
 });

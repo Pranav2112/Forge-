@@ -40,7 +40,7 @@ async function Nutrition({ searchParams }: { searchParams: Promise<{ date?: stri
         }
       />
       <div className="mb-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="sticky top-2 z-20">
+        <Card className="z-20 md:sticky md:top-2">
           <CardHeader><CardTitle>Daily totals</CardTitle></CardHeader>
           <CardContent className="grid gap-3">
             {data.target ? (
@@ -79,7 +79,7 @@ async function Nutrition({ searchParams }: { searchParams: Promise<{ date?: stri
       <Card className="mb-4">
         <CardHeader><CardTitle>Add food</CardTitle></CardHeader>
         <CardContent>
-          <FoodLogger foods={data.foods} date={data.date} recentIds={data.recentIds} />
+          <FoodLogger foods={data.foods} date={data.date} recentIds={data.recentIds} frequentIds={data.frequentFoodIds} />
         </CardContent>
       </Card>
       <div className="mb-4">
